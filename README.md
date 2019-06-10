@@ -15,7 +15,7 @@ However, this current implementation is flawed. For one, Themer has no idea if t
 <h2>How would a standard Look & Feel theme be made fully compatible with Themer?</h2>
 To make a Standard L&F fully compatible with Themer, you need to create a folder in the Look & Feel's 'contents' folder called 'feren-themer' followed by a file in there called 'details'.
 
-Here's an example of what should be inserted:
+Here's an example of what should be inserted into 'details':
 ```
 [THEMER THEME]
 GTKTheme=Breeze
