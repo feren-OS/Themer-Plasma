@@ -1,0 +1,32 @@
+#!/bin/bash
+#$1 = rc file
+#$2 = [Category]
+#$3 = Setting Name
+
+currentdir="$(pwd)"
+
+xdgdirs="$(echo $XDG_CONFIG_DIRS | sed 's/:/ /g')"
+xdgdirs="$HOME/.config $xdgdirs"
+for folder in $xdgdirs; do
+    if [ -d "$folder" ]; then
+        cd "$folder"
+        if [ -f "$1" ]; then
+            if grep -q "$2]" "$1"; then
+                filecontents=$(grep -A9999999999 "$2]" "$1" | sed -n '1!p')
+                while read -r line; do
+                    if [[ "$line" == "$3="* ]]; then
+                        echo "$line" | sed "s/$3=//g"
+                        exit 0
+                    fi
+                    if [[ "$line" == "["* ]]; then
+                        break
+                    fi
+                done <<< "$filecontents"
+            fi
+        fi
+        cd "$currentdir"
+    fi
+done            
+
+#Nothing was found for this setting
+exit 1

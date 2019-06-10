@@ -1,0 +1,422 @@
+#!/bin/bash
+if wmctrl -l | grep -q "Desktop — Plasma"; then
+    askaboutlayoutchangelater=true
+fi
+export TEXTDOMAIN=$(basename $0)
+source gettext.sh
+homedir=$(eval echo "~$(whoami)")
+
+#Checks
+if [[ ! "$1" = *"/"* ]]; then
+    #Check for the theme in known locations
+    if [ -d "$HOME/.local/share/plasma/look-and-feel/$1" ]; then
+        themenm="$HOME/.local/share/plasma/look-and-feel/$1"
+    elif [ -d "/usr/share/plasma/look-and-feel/$1" ]; then
+        themenm="/usr/share/plasma/look-and-feel/$1"
+    else
+        echo "$(eval_gettext "Look & Feel Pack Supplied Not Found.")"
+        exit 0
+    fi
+else
+    if [ -d "$1" ]; then
+        themenm="$1"
+    else
+        echo "$(eval_gettext "Look & Feel Pack Supplied Not Found.")"
+        exit 0
+    fi
+fi
+
+if [ -z "$askaboutlayoutchangelater" ]; then
+    killall latte-dock plasmashell feren-latte-launch
+    feren-theme-tool revertmeta
+    revertmetadone=1
+fi
+
+cd "$themenm"
+cd ..
+themedir=$(pwd)
+themenm=$(echo $themenm | sed "s?$themedir/??g")
+cd "./$themenm"
+gsettings set org.feren.feren-themer.plasma theme-name "$themenm"
+
+if [ ! -d ./contents/feren-themer ]; then
+    kdialog --title="Themer" --msgbox "This Look & Feel does not include configurations for GTK Applications and other settings applied on top of the Look & Feel Package by Themer, therefore we have only applied the Look & Feel Package itself and what parts of the theme are supplied by the package itself." &
+    lookandfeelonly="1"
+fi
+cd "$themedir/$themenm/contents/feren-themer"
+
+killall feren-xsettings-daemon
+
+if [  "$lookandfeelonly" = "1" ]; then
+    cd "$themedir/$themenm/contents/"
+    dotcount="."
+else
+    dotcount=".."
+fi
+
+#Icons
+icons=$(grep -A 1 "\[kdeglobals]\[Icons]" "$dotcount/defaults" | sed -n '2 p')
+if [ ! -z "$icons" ] && [ ! "$icons" = "" ]; then
+    icons=$(echo $icons | sed "s/Theme=//g")
+    /usr/bin/plasma-icons-apply "$icons" --no-xsettings --gtk-only
+fi
+
+#GTK Theme
+if [ ! "$lookandfeelonly" = "1" ]; then
+    theme=$(grep -hr "GTKTheme=" "./details")
+    if [ ! -z "$theme" ] && [ ! "$theme" = "" ]; then
+        theme=$(echo $theme | sed "s/GTKTheme=//g")
+        /usr/bin/plasma-gtk-apply "$theme" --no-xsettings
+    fi
+fi
+
+#Cursor Theme (GTK)
+icons2=$(grep -A 1 "\[kcminputrc][Mouse]" "$dotcount/defaults" | sed -n '2 p')
+if [ ! -z "$icons2" ] && [ ! "$icons2" = "" ]; then
+    icons2=$(echo $icons2 | sed "s/cursorTheme=//g")
+    /usr/bin/plasma-gtkcursor-apply "$icons2" --no-xsettings
+fi
+
+#Dark GTK Application Titlebars Colour
+if [ ! "$lookandfeelonly" = "1" ]; then
+    #value1=$(gsettings get org.feren.feren-themer.plasma allow-wmlayout-change)
+    #if [ "$value1" = "true" ]; then
+        layout=$(grep -hr "DarkWMColour=" "./details")
+        if [ ! -z "$layout" ] && [ ! "$layout" = "" ]; then
+            layout=$(echo $layout | sed "s/DarkWMColour=//g")
+            /usr/bin/feren-theme-tool setdarktheme "$layout"
+        fi
+    #fi
+fi
+
+killall feren-xsettings-daemon feren-xsettings-daemon-start change-xsettingsd-theme
+rm -f /tmp/xsettings-lock-$(whoami)
+nohup feren-xsettings-daemon-start --start >/dev/null 2>&1 &
+
+if ! wmctrl -l | grep -q "Desktop — Plasma"; then
+    askaboutlayoutchangelater=""
+fi
+if [ -z "$askaboutlayoutchangelater" ]; then
+    killall latte-dock plasmashell feren-latte-launch
+    feren-theme-tool revertmeta
+    revertmetadone=1
+fi
+if [ ! -z "$askaboutlayoutchangelater" ] && [ -z "$lookandfeelonly" ]; then
+    askaboutlayoutchangelater=true
+    if "$(gsettings get org.feren.feren-themer.plasma allow-dock-change)" = "true" ]; then
+        dockchangable="
+- Dock Type"
+    fi
+    if "$(gsettings get org.feren.feren-themer.plasma allow-latte-change)" = "true" ]; then
+        lattedockchangable="
+- Latte Dock Layout and Latte Dock Layout Configuration"
+    fi
+    if "$(gsettings get org.feren.feren-themer.plasma allow-wmlayout-change)" = "true" ]; then
+        wmlayoutchangable="
+- Global Titlebar Buttons layout"
+    fi
+    if "$(gsettings get org.feren.feren-themer.plasma allow-nemo-change)" = "true" ]; then
+        nemochangable="
+- Files (Nemo) Toolbar, Menubar and Statusbar layouts
+- General Files (Nemo) Look and Feel"
+    fi
+    if [ ! -z "$lattedockchangable" ] || [ ! -z "$dockchangable" ] || [ ! -z "$nemochangable" ]; then
+        zenity --question --default-cancel --title="Themer" --text="Would you like to change the look and feel of some extra parts of the Feren OS Experience?
+If you choose 'Yes', the following will change:""$lattedockchangable""$dockchangable""$nemochangable""" --no-wrap
+        if [ ! $? -eq 0 ]; then
+            nolayoutchange=true
+        else
+            if [ ! -f ~/.feren/plasma-themer-layout-tip-viewed ]; then
+                zenity --info --title="Themer" --text='Were you trying to apply the whole desktop layout from this Look and Feel?
+                
+If the answer to that question is yes, make sure next time to tick the checkbox that says "Use desktop layout from theme"
+after selecting the Look and Feel theme you desire, otherwise you will not have the accompanying desktop layout applied.
+This reminder will stop appearing once you dismiss it, so keep the checkbox in mind in the future.' --no-wrap &
+                touch ~/.feren/plasma-themer-layout-tip-viewed
+            fi
+        fi
+    fi
+fi
+
+#WM Layout
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    value1=$(gsettings get org.feren.feren-themer.plasma allow-wmlayout-change)
+    if [ "$value1" = "true" ]; then
+        layout=$(grep -hr "WMLayout=" "./details")
+        if [ ! -z "$layout" ] && [ ! "$layout" = "" ]; then
+            layout=$(echo $layout | sed "s/WMLayout=//g")
+            /usr/bin/plasma-wmlayout-apply "$layout" --no-xsettings
+        fi
+    fi
+fi
+
+#FilesStyle
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+value1=$(gsettings get org.feren.feren-themer.plasma allow-nemo-change)
+if [ "$value1" = "true" ]; then
+    filesstyle=$(grep -hr "FilesStyle=" "./details")
+    if [ ! -z "$filesstyle" ] && [ ! "$filesstyle" = "" ]; then
+        filesstyle=$(echo $filesstyle | sed "s/FilesStyle=//g")
+        if [ "$filesstyle" = "Classic" ]; then
+            gsettings set org.nemo.preferences show-location-entry true
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar true
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar true
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar true
+            gsettings set org.nemo.window-state start-with-menu-bar true
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "WindowsRibbon" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar true
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar true
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar false
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "Windows" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar true
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar true
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar false
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "Basic" ]; then
+            gsettings set org.nemo.preferences show-location-entry true
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar true
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar true
+            gsettings set org.nemo.window-state start-with-sidebar false
+            gsettings set org.nemo.window-state start-with-status-bar true
+            gsettings set org.nemo.window-state start-with-menu-bar true
+            gsettings set org.nemo.window-state start-with-toolbar false
+            gsettings set org.nemo.preferences show-full-path-titles true
+            gsettings set org.nemo.preferences always-use-browser false
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "ferenOS" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar false
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar false
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar true
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "ferenOSOld" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar false
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar false
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar false
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "mac" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar false
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar true
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar true
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "ChromeOS" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar false
+            gsettings set org.nemo.preferences show-up-icon-toolbar false
+            gsettings set org.nemo.preferences show-reload-icon-toolbar false
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar false
+            gsettings set org.nemo.window-state start-with-menu-bar false
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar false
+        fi
+        if [ "$filesstyle" = "Mint" ]; then
+            gsettings set org.nemo.preferences show-location-entry false
+            gsettings set org.nemo.preferences show-new-folder-icon-toolbar false
+            gsettings set org.nemo.preferences show-up-icon-toolbar true
+            gsettings set org.nemo.preferences show-reload-icon-toolbar false
+            gsettings set org.nemo.window-state start-with-sidebar true
+            gsettings set org.nemo.window-state start-with-status-bar true
+            gsettings set org.nemo.window-state start-with-menu-bar true
+            gsettings set org.nemo.window-state start-with-toolbar true
+            gsettings set org.nemo.preferences show-full-path-titles false
+            gsettings set org.nemo.preferences always-use-browser true
+            gsettings set org.nemo.preferences show-edit-icon-toolbar true
+        fi
+    fi
+fi
+fi
+
+#Latte Layout
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+value1=$(gsettings get org.feren.feren-themer.plasma allow-latte-change)
+if [ "$value1" = "true" ]; then
+    latte=$(grep -hr "LatteTheme=" "./details")
+    if [ ! -z "$latte" ] && [ ! "$latte" = "" ]; then
+        latte=$(echo $latte | sed "s/LatteTheme=//g")
+        if [ "$latte" = "None" ]; then
+            killall themer-docky-launch-cinnamon
+            killall docky
+            killall feren-latte-launch
+            killall latte-dock
+            rm -f $homedir/.config/autostart/docky.desktop
+            rm -f $homedir/.config/autostart/org.kde.latte-dock.desktop
+        else
+            killall themer-docky-launch-cinnamon
+            killall docky
+            killall feren-latte-launch
+            killall latte-dock
+            rm -f $homedir/.config/autostart/docky.desktop
+            if [ ! -f "$homedir/.config/latte/$latte.layout.latte" ]; then
+                cp -f "/usr/share/plasma/shells/org.kde.latte.shell/contents/presets/$latte.layout.latte" "$homedir/.config/latte/$latte.layout.latte"
+            fi
+            if [ -f "$homedir/.config/latte/$latte.layout.latte" ]; then
+                sed -i "s/.*currentLayout=.*/currentLayout=$latte/" $homedir/.config/lattedockrc
+                sed -i "s/.*lastNonAssignedLayout=.*/lastNonAssignedLayout=$latte/" $homedir/.config/lattedockrc
+            else
+                echo "W: Latte Dock Themeing couldn't be applied successfully"
+            fi
+        fi
+    else
+        killall themer-docky-launch-cinnamon
+        killall docky
+        killall feren-latte-launch
+        killall latte-dock
+        rm -f $homedir/.config/autostart/docky.desktop
+        rm -f $homedir/.config/autostart/org.kde.latte-dock.desktop
+    fi
+fi
+fi
+
+#Dock Type
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+value1=$(gsettings get org.feren.feren-themer.plasma allow-dock-change)
+if [ "$value1" = "true" ]; then
+    dock=$(grep -hr "DockType=" "./details")
+    if [ ! -z "$dock" ] && [ ! "$dock" = "" ]; then
+        dock=$(echo $dock | sed "s/DockType=//g")
+        if [ "$dock" = "Latte" ]; then
+            killall docky
+            killall themer-docky-launch
+            rm $homedir/.config/autostart/docky.desktop
+            cp '/etc/skel/.config/autostart/org.kde.latte-dock.desktop' $homedir/.config/autostart/
+        fi
+        if [ "$dock" = "Docky" ]; then
+            killall latte-dock
+            killall feren-latte-launch
+            rm $homedir/.config/autostart/org.kde.latte-dock.desktop
+            cp '/usr/share/feren-os/feren-themer/STARTUP-APPLICATIONS/docky-cinnamon.desktop' $homedir/.config/autostart/
+            /usr/bin/feren-theme-tool revertmeta
+        fi
+    else
+        killall feren-latte-launch
+        killall themer-docky-launch
+        killall docky
+        killall latte-dock
+        rm $homedir/.config/autostart/docky.desktop
+        rm $homedir/.config/autostart/org.kde.latte-dock.desktop
+        /usr/bin/feren-theme-tool revertmeta
+    fi
+fi
+fi
+
+#Latte Meta Integration
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+value1=$(gsettings get org.feren.feren-themer.plasma allow-latte-change)
+if [ "$value1" = "true" ]; then
+    lattemeta=$(grep -hr "LatteMetaFocus=" "./details")
+    if [ ! -z "$lattemeta" ] && [ ! "$lattemeta" = "" ]; then
+        lattemeta=$(echo $lattemeta | sed "s/LatteMetaFocus=//g")
+        if [ "$lattemeta" = "True" ]; then
+            /usr/bin/feren-theme-tool lattemeta
+        else
+            if [ -z "$revertmetadone" ]; then
+                /usr/bin/feren-theme-tool revertmeta; fi
+        fi
+    else
+        if [ -z "$revertmetadone" ]; then
+            /usr/bin/feren-theme-tool revertmeta; fi
+    fi
+fi
+elif [ "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    /usr/bin/feren-theme-tool revertmeta
+fi
+
+#App Launcher Files Window
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    applauncher=$(grep -hr "AppLauncher=" "./details")
+    if [ ! -z "$applauncher" ] && [ ! "$applauncher" = "" ]; then
+        applauncher=$(echo $applauncher | sed "s/AppLauncher=//g")
+        if [ "$applauncher" = "True" ]; then
+            nohup themer-applauncher-launch >/dev/null 2>&1 &
+            cp '/usr/share/feren-os/feren-themer/STARTUP-APPLICATIONS/applauncher.desktop' $homedir/.config/autostart/
+        fi
+        if [ "$applauncher" = "False" ]; then
+            killall themer-applauncher-launch
+            rm $homedir/.config/autostart/applauncher.desktop
+        fi
+    else
+	    killall themer-applauncher-launch
+        rm $homedir/.config/autostart/applauncher.desktop
+    fi
+fi
+
+#Maximised Titlebar Hiding
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    titlebarhiding=$(grep -hr "MaximisedTitlebarHide=" "./details")
+    if [ ! -z "$titlebarhiding" ] && [ ! "$titlebarhiding" = "" ]; then
+        titlebarhiding=$(echo $titlebarhiding | sed "s/MaximisedTitlebarHide=//g")
+        if [ "$titlebarhiding" = "True" ]; then
+            /usr/bin/feren-theme-tool hide-maximised-titlebar &
+        else
+            /usr/bin/feren-theme-tool show-maximised-titlebar &
+        fi
+    else
+	    /usr/bin/feren-theme-tool show-maximised-titlebar &
+    fi
+elif [ "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    /usr/bin/feren-theme-tool show-maximised-titlebar &
+fi
+
+cd ~
+if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
+    if [ "$dock" = "Latte" ]; then
+        nohup feren-latte-launch >/dev/null 2>&1 &
+        lattepid=$!
+    elif [ "$dock" = "Docky" ]; then
+        nohup themer-docky-launch >/dev/null 2>&1 &
+        dockypid=$!
+    fi
+fi
+plasmashell &

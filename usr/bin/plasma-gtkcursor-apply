@@ -1,0 +1,11 @@
+#!/bin/bash
+
+sed -i "$(echo "/gtk-cursor-theme-name=/c\gtk-cursor-theme-name=$1")" ~/.config/gtk-3.0/settings.ini
+sed -i "s%.*Gtk/CursorThemeName .*%Gtk/CursorThemeName "'"'"$1"'"'"%g" ~/.config/xsettingsd/xsettingsd.conf
+sed -i "/gtk-cursor-theme-name=/c\gtk-cursor-theme-name="'"'"$1"'"' ~/.gtkrc-2.0
+if [ ! "$2" = "--no-xsettings" ]; then
+    killall feren-xsettings-daemon
+    nohup feren-xsettings-daemon >/dev/null 2>&1 &
+    sleep 1
+    rm -f nohup.out
+fi

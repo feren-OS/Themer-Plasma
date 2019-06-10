@@ -1,0 +1,66 @@
+#!/bin/bash
+#Buttons Layout (Plasma VS GTK):
+#M : menu
+#N (App's Menu) : N/A
+#S (on all desktops) : stick
+#I (minimise) : minimize
+#A (maximise) : maximize
+#X (close) : close
+#H (context help) : N/A
+#L (shade) : shade
+#B (keep below) : N/A
+#F (keep above) : N/A
+homedir=$(eval echo "~$(whoami)")
+
+leftside=$(echo "$1" | cut -d: -f1)
+rightside=${1#*:}
+leftsidegtk=""
+rightsidegtk=""
+
+leftsidenew=$(echo "$leftside" | sed -e 's/\(.\)/\1\n/g')
+for winbtn in $leftsidenew; do
+    if [ "$winbtn" = "M" ]; then
+        leftsidegtk="$leftsidegtk,menu"
+    elif [ "$winbtn" = "S" ]; then
+        leftsidegtk="$leftsidegtk,stick"
+    elif [ "$winbtn" = "I" ]; then
+        leftsidegtk="$leftsidegtk,minimize"
+    elif [ "$winbtn" = "A" ]; then
+        leftsidegtk="$leftsidegtk,maximize"
+    elif [ "$winbtn" = "X" ]; then
+        leftsidegtk="$leftsidegtk,close"
+    elif [ "$winbtn" = "L" ]; then
+        leftsidegtk="$leftsidegtk,shade"
+    fi
+    leftsidegtk=${leftsidegtk#","}
+done
+rightsidenew=$(echo "$rightside" | sed -e 's/\(.\)/\1\n/g')
+for winbtn in $rightsidenew; do
+    if [ "$winbtn" = "M" ]; then
+        rightsidegtk="$rightsidegtk,menu"
+    elif [ "$winbtn" = "S" ]; then
+        rightsidegtk="$rightsidegtk,stick"
+    elif [ "$winbtn" = "I" ]; then
+        rightsidegtk="$rightsidegtk,minimize"
+    elif [ "$winbtn" = "A" ]; then
+        rightsidegtk="$rightsidegtk,maximize"
+    elif [ "$winbtn" = "X" ]; then
+        rightsidegtk="$rightsidegtk,close"
+    elif [ "$winbtn" = "L" ]; then
+        rightsidegtk="$rightsidegtk,shade"
+    fi
+    rightsidegtk=${rightsidegtk#","}
+done
+
+sed -i "$(echo "/gtk-decoration-layout=/c\gtk-decoration-layout=$leftsidegtk:$rightsidegtk")" ~/.config/gtk-3.0/settings.ini
+sed -i "s%.*Gtk/DecorationLayout .*%Gtk/DecorationLayout "'"'"$leftsidegtk:$rightsidegtk"'"'"%g" ~/.config/xsettingsd/xsettingsd.conf
+kwriteconfig5 --file ~/.config/kwinrc --group "org.kde.kdecoration2" --key "ButtonsOnLeft" "$leftside"
+kwriteconfig5 --file ~/.config/kwinrc --group "org.kde.kdecoration2" --key "ButtonsOnRight" "$rightside"
+qdbus org.kde.KWin /KWin reconfigure &
+
+if [ ! "$2" = "--no-xsettings" ]; then
+    killall feren-xsettings-daemon
+    nohup feren-xsettings-daemon >/dev/null 2>&1 &
+    sleep 1
+    rm -f nohup.out
+fi

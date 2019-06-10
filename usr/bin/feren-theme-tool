@@ -1,0 +1,156 @@
+#!/bin/bash
+
+toptext="Applying Theme, please wait...\nProgress:"
+
+function findcategory {
+    currentdir="$(pwd)"
+    xdgdirs="$(echo $XDG_CONFIG_DIRS | sed 's/:/ /g')"
+    xdgdirs="$HOME/.config $xdgdirs"
+    for folder in $xdgdirs; do
+        if [ -d "$folder" ]; then
+            cd "$folder"
+            if [ -f "kwinrulesrc" ]; then
+                if grep -q "Description=Feren Themer GTK Dark Titlebars Workaround" "kwinrulesrc"; then
+                    filecontents=$(cat "kwinrulesrc" | grep 'Description=Feren Themer GTK Dark Titlebars Workaround' -B5 | grep '\[' | sed 's/\[//g' | sed 's/\]//g')
+                    if [ ! -z "$filecontents" ]; then
+                        echo "$filecontents"
+                        cd "$currentdir"
+                        break
+                    fi
+                fi
+            fi
+            cd "$currentdir"
+        fi
+    done
+}
+
+function darkmode {
+    echo "#$toptext Applying Plasma Themeing"
+    echo 25
+    lookandfeeltool -a org.feren.dark
+    
+    echo "#$toptext Applying Icons"
+    echo 50
+    plasma-icons-apply "Inspire Dark" --no-xsettings --gtk-only
+    
+    echo "#$toptext Applying GTK Theme"
+    echo 75
+    plasma-gtk-apply "feren-dark" --no-xsettings
+    
+    echo "#$toptext Finishing"
+    echo 100
+    killall feren-xsettings-daemon feren-xsettings-daemon-start change-xsettingsd-theme
+    rm -f /tmp/xsettings-lock-$(whoami)
+    nohup feren-xsettings-daemon-start --start >/dev/null 2>&1 &
+}
+
+function maximizetitlebarhide {
+    echo "#$toptext Enabling 'Hide Titlebar On Maximise'"
+    echo 50
+    kwriteconfig5 --file ~/.config/kwinrc --group Windows --key BorderlessMaximizedWindows "true"
+    echo "#$toptext Reloading KWin Configurations"
+    echo 100
+    qdbus org.kde.KWin /KWin reconfigure &
+}
+function nomaximizetitlebarhide {
+    echo "#$toptext Disabling 'Hide Titlebar On Maximise'"
+    echo 50
+    kwriteconfig5 --file ~/.config/kwinrc --group Windows --key BorderlessMaximizedWindows "false"
+    echo "#$toptext Reloading KWin Configurations"
+    echo 100
+    qdbus org.kde.KWin /KWin reconfigure &
+}
+
+function latte-meta {
+    echo "#$toptext Setting Meta Reciever to Latte Dock'"
+    echo 50
+    kwriteconfig5 --file ~/.config/kwinrc --group ModifierOnlyShortcuts --key Meta "org.kde.lattedock,/Latte,org.kde.LatteDock,activateLauncherMenu"
+    echo "#$toptext Reloading KWin Configurations"
+    echo 100
+    qdbus org.kde.KWin /KWin reconfigure &
+}
+function revert-meta {
+    echo "#$toptext Setting Meta Reciever back to Plasma'"
+    echo 50
+    kwriteconfig5 --file ~/.config/kwinrc --group ModifierOnlyShortcuts --key Meta "org.kde.plasmashell,/PlasmaShell,org.kde.PlasmaShell,activateLauncherMenu"
+    kquitapp kglobalaccel
+    if grep -q "\[lattedock\]" "$HOME/.config/kglobalshortcutsrc"; then
+    kglobalshortcutsrc=$(cat "$HOME/.config/kglobalshortcutsrc" | sed -n -e '/\[lattedock\]/,/\[/ p' | grep "Alt+F1,")
+    while read -r line; do
+        mainsetting=${line%%=*}
+        value=${line##*=}
+        value=$(echo "$value" | sed 's/Alt+F1,/none,/g')
+        echo "$mainsetting, $value"
+        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group lattedock --key "$mainsetting" "$value"
+    done <<< "$kglobalshortcutsrc"
+    fi
+    sed -i 's/global=Alt+F1/global=/g' "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+    if grep -q "\[plasmashell\]" "$HOME/.config/kglobalshortcutsrc"; then
+    kglobalshortcutsrc=$(cat "$HOME/.config/kglobalshortcutsrc" | sed -n -e '/\[plasmashell\]/,/\[/ p' | grep "Alt+F1,")
+    while read -r line; do
+        mainsetting=${line%%=*}
+        value=${line##*=}
+        value=$(echo "$value" | sed 's/Alt+F1,/none,/g')
+        echo "$mainsetting, $value"
+        kwriteconfig5 --file ~/.config/kglobalshortcutsrc --group plasmashell --key "$mainsetting" "$value"
+    done <<< "$kglobalshortcutsrc"
+    fi
+    echo "#$toptext Reloading KWin Configurations"
+    echo 100
+    qdbus org.kde.KWin /KWin reconfigure &
+    kglobalaccel &
+}
+
+function resettheme {
+    echo "#$toptext Applying Plasma Themeing"
+    echo 25
+    lookandfeeltool -a org.feren.default
+    
+    echo "#$toptext Applying Icons"
+    echo 50
+    plasma-icons-apply "Inspire" --no-xsettings --gtk-only
+    
+    echo "#$toptext Applying GTK Theme"
+    echo 75
+    plasma-gtk-apply "feren" --no-xsettings
+    
+    echo "#$toptext Finishing"
+    echo 100
+    killall feren-xsettings-daemon feren-xsettings-daemon-start change-xsettingsd-theme
+    rm -f /tmp/xsettings-lock-$(whoami)
+    nohup feren-xsettings-daemon-start --start >/dev/null 2>&1 &
+}
+
+if [ "$1" = "dark-mode" ]; then
+    darkmode | zenity --progress --title="Applying Theme" --text="$toptext Progress: Getting the themeing ready" --auto-close --no-cancel
+elif [ "$1" = "reset-theme" ]; then
+    resettheme | zenity --progress --title="Applying Theme" --text="$toptext Progress: Getting the themeing ready" --auto-close --no-cancel
+elif [ "$1" = "hide-maximised-titlebar" ]; then
+    toptext="Applying Setting, please wait...\nProgress:"
+    maximizetitlebarhide | zenity --progress --title="Applying Setting" --text="$toptext Progress: Getting ready" --auto-close --no-cancel
+elif [ "$1" = "show-maximised-titlebar" ]; then
+    toptext="Applying Setting, please wait...\nProgress:"
+    nomaximizetitlebarhide | zenity --progress --title="Applying Setting" --text="$toptext Progress: Getting ready" --auto-close --no-cancel
+elif [ "$1" = "lattemeta" ]; then
+    toptext="Applying Setting, please wait...\nProgress:"
+    latte-meta | zenity --progress --title="Applying Setting" --text="$toptext Progress: Getting ready" --auto-close --no-cancel
+elif [ "$1" = "revertmeta" ]; then
+    toptext="Applying Setting, please wait...\nProgress:"
+    revert-meta | zenity --progress --title="Applying Setting" --text="$toptext Progress: Getting ready" --auto-close --no-cancel
+elif [ "$1" = "setdarktheme" ] && [ ! -z "$2" ]; then
+    wmruleno=$(findcategory)
+    echo "$wmruleno"
+    kwriteconfig5 --file ~/.config/kwinrulesrc --group $wmruleno --key "decocolor" "$2"
+    qdbus org.kde.KWin /KWin reconfigure &
+else
+    echo "feren-theme-tool usage:
+dark-mode: Apply Dark Mode for the default theme (Plasma)
+reset-theme: Reset the theme back to Feren Default (Plasma)
+hide-maximised-titlebar: Hide maximised titlebars (Plasma)
+show-maximised-titlebar: Show maximised titlebars (Plasma)
+lattemeta: Set Meta to trigger the assigned menu applet in Latte Dock rather than in Plasma Shell (Plasma)
+revertmeta: Revert Meta to triggering the assigned menu applet in Plasma Shell rather than in Latte Dock (Plasma)
+setdarktheme colourname: Change the Dark Theme Applications workaround titlebar colour scheme (Plasma)"
+    exit 1
+fi
+exit 0

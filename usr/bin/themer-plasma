@@ -1,0 +1,22 @@
+#!/bin/bash
+#themer-plasma: Background utility for applying Themer themes when the Look & Feel theme is changed
+if [[ ! "$DESKTOP_SESSION" == *"plasma" ]]; then
+	exit 0
+fi
+
+### Set initial time of file
+LTIME=`stat -c %Z ~/.config/kdeglobals`
+currenttheme=$(plasma-getvalue kdeglobals KDE LookAndFeelPackage)
+
+while xhost >& /dev/null; do
+    ATIME=`stat -c %Z ~/.config/kdeglobals`
+
+    if [[ "$ATIME" != "$LTIME" ]]; then
+        if [[ "$(plasma-getvalue kdeglobals KDE LookAndFeelPackage)" != "$currenttheme" ]]; then
+            currenttheme=$(plasma-getvalue kdeglobals KDE LookAndFeelPackage)
+            themer-file-apply-kde "$currenttheme" &
+        fi
+        LTIME=$ATIME
+    fi
+    sleep 0.2
+done

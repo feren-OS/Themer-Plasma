@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema path="/org/feren/feren-themer/plasma/" id="org.feren.feren-themer.plasma" gettext-domain="@GETTEXT_PACKAGE@">
+    <key type="s" name="theme-name">
+      <default>"feren Default"</default>
+      <summary>The name of the currently applied theme</summary>
+      <description>This is the setting for feren OS to know what theme is currently applied</description>
+    </key>
+    <key type="b" name="customised">
+      <default>true</default>
+      <summary>Is the current theme customised?</summary>
+      <description>If the current theme is customised, this setting should be checked, as to make sure feren OS doesn't reapply the theme again.</description>
+    </key>
+
+    <key type="b" name="allow-desktop-layout-change">
+      <default>true</default>
+      <summary>Allow themes to change Desktop Layout</summary>
+      <description>
+        Should a theme be allowed to change Desktop Layout?
+      </description>
+    </key>
+
+    <key type="b" name="allow-wmfont-change">
+      <default>true</default>
+      <summary>Allow themes to change Titlebar Font</summary>
+      <description>
+        Should a theme be allowed to change the Titlebar Font?
+      </description>
+    </key>
+
+    <key type="b" name="allow-wmlayout-change">
+      <default>true</default>
+      <summary>Allow themes to change the Titlebar Buttons Layout</summary>
+      <description>
+        Should a theme be allowed to change the Titlebar Buttons Layout?
+      </description>
+    </key>
+
+    <key type="b" name="allow-latte-change">
+      <default>true</default>
+      <summary>Allow themes to change Latte</summary>
+      <description>
+        Should a theme be allowed to change the current Latte Layout?
+      </description>
+    </key>
+    
+    <key type="b" name="allow-dock-change">
+      <default>true</default>
+      <summary>Allow themes to change the dock</summary>
+      <description>
+        Should a theme be allowed to change the current Dock Program?
+      </description>
+    </key>
+
+    <key type="b" name="allow-nemo-change">
+      <default>true</default>
+      <summary>Allow themes to change Nemo</summary>
+      <description>
+        Should a theme be allowed to change the look and feel of Files?
+      </description>
+    </key>
+  </schema>
+</schemalist>
