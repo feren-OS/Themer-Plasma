@@ -373,25 +373,6 @@ elif [ "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
     /usr/bin/feren-theme-tool revertmeta
 fi
 
-#App Launcher Files Window
-if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
-    applauncher=$(grep -hr "AppLauncher=" "./details")
-    if [ ! -z "$applauncher" ] && [ ! "$applauncher" = "" ]; then
-        applauncher=$(echo $applauncher | sed "s/AppLauncher=//g")
-        if [ "$applauncher" = "True" ]; then
-            nohup themer-applauncher-launch >/dev/null 2>&1 &
-            cp '/usr/share/feren-os/feren-themer/STARTUP-APPLICATIONS/applauncher.desktop' $homedir/.config/autostart/
-        fi
-        if [ "$applauncher" = "False" ]; then
-            killall themer-applauncher-launch
-            rm $homedir/.config/autostart/applauncher.desktop
-        fi
-    else
-	    killall themer-applauncher-launch
-        rm $homedir/.config/autostart/applauncher.desktop
-    fi
-fi
-
 #Maximised Titlebar Hiding
 if [ ! "$lookandfeelonly" = "1" ] && [ -z "$nolayoutchange" ]; then
     titlebarhiding=$(grep -hr "MaximisedTitlebarHide=" "./details")
