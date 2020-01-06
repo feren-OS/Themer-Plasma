@@ -1,3 +1,7 @@
+This code has been ditched in favour of https://github.com/feren-OS/plasma-desktop-kcms/tree/master/kcms/lookandfeel.
+
+
+
 # Themer Plasma
 The Feren OS Themer Utility for the KDE Plasma Desktop Environment
 
